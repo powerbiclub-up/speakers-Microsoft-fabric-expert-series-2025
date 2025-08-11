@@ -1,233 +1,61 @@
+<!-- Copy-paste this into an HTML file -->
 <!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Microsoft Fabric Thursdays — Expert Series 2025 — Schedule Grid</title>
-  <meta name="description" content="Schedule grid for Microsoft Fabric Thursdays Expert Series - 2025. Embeds Sessionize GridSmart widget with a JS fallback that renders a responsive accessible grid. Intended for GitHub Pages." />
-  <style>
-    :root{ --bg:#0f1724; --card:#0b1220; --muted:#94a3b8; --accent:#0366d6; --glass:rgba(255,255,255,0.03); }
-    html,body{height:100%;margin:0;font-family:Inter,system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial; background:linear-gradient(180deg,#071028 0%, #07111b 100%); color:#e6eef8}
-    .wrap{max-width:1100px;margin:32px auto;padding:24px}
-    header{display:flex;align-items:center;gap:16px}
-    .logo{width:56px;height:56px;border-radius:8px;background:linear-gradient(135deg,var(--accent),#7c3aed);display:flex;align-items:center;justify-content:center;font-weight:700}
-    h1{margin:0;font-size:20px}
-    p.lead{margin:6px 0 18px;color:var(--muted)}
-
-    /* container used by Sessionize script */
-    #sessionize-widget{min-height:360px;border-radius:12px;background:var(--glass);padding:12px}
-
-    /* fallback schedule grid */
-    .schedule{display:grid;grid-template-columns:150px 1fr;gap:12px;margin-top:18px}
-    .time-col{display:flex;flex-direction:column;gap:12px}
-    .time-cell{padding:8px 10px;background:rgba(255,255,255,0.02);border-radius:8px;font-size:13px;color:var(--muted)}
-    .slot{padding:12px;border-radius:10px;background:linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01));box-shadow:0 2px 10px rgba(2,6,23,0.6)}
-    .slot h3{margin:0 0 6px;font-size:15px}
-    .slot p{margin:0;font-size:13px;color:var(--muted)}
-
-    /* small screens: single column */
-    @media (max-width:700px){
-      .schedule{grid-template-columns:1fr;}
-      .time-col{flex-direction:row;overflow-x:auto;padding-bottom:6px}
-      .time-cell{min-width:88px}
-    }
-
-    /* subtle credits */
-    .meta{margin-top:18px;color:var(--muted);font-size:13px}
-    .cta{display:inline-block;margin-top:12px;padding:8px 12px;border-radius:8px;background:rgba(3,102,214,0.12);color:var(--accent);text-decoration:none}
-  </style>
-</head>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
 <body>
-  <div class="wrap">
-    <header>
-      <div class="logo">MF</div>
-      <div>
-        <h1>Microsoft Fabric Thursdays — Expert Series 2025</h1>
-        <p class="lead">Official schedule grid — embedded from Sessionize (GridSmart). If the widget is blocked, a JavaScript fallback will render a friendly schedule grid below.</p>
-      </div>
-    </header>
-
-    <!-- Sessionize embed: the user-provided script -->
-    <div id="sessionize-widget" aria-live="polite">
-      <noscript>
-        Sessionize schedule requires JavaScript. Please enable JavaScript to view the interactive grid.
-      </noscript>
-      <!-- Sessionize script (provided by user) -->
-      <script type="text/javascript" src="https://sessionize.com/api/v2/86whgvu9/view/GridSmart"></script>
-    </div>
-
-    <!-- Fallback content for sites that block third-party scripts (e.g., some GitHub views).
-         This constructs a schedule table using Sessionize's JSON endpoint where possible.
-         Note: GitHub README pages and some restricted environments do NOT run JS — for README.md
-         you should publish a GitHub Pages site or include a static table in markdown instead. -->
-
-    <section id="fallback" aria-hidden="true">
-      <div class="schedule" id="schedule-grid" hidden>
-        <div class="time-col" id="time-column"></div>
-        <div id="slot-column"></div>
-      </div>
-
-      <div class="meta" id="fallback-meta" hidden>
-        <div>Fallback schedule rendered because the Sessionize widget failed to load or was blocked.</div>
-        <div style="margin-top:6px">If you intend to host on GitHub, use GitHub Pages (not the README) to allow external JavaScript. For README.md, paste a generated markdown table (example included in comments).</div>
-      </div>
-    </section>
-
-    <!-- Small utility to download markdown table for README use -->
-    <div style="margin-top:14px">
-      <button id="generate-md" class="cta" style="display:none">Generate Markdown for README</button>
-      <a id="open-pages" class="cta" target="_blank" rel="noopener" href="#" style="display:none">Open GitHub Pages preview</a>
-    </div>
-  </div>
+  <div id="schedule"></div>
 
   <script>
-    // Fallback renderer: try to fetch schedule from Sessionize's GridSmart view.
-    // NOTE: CORS may block this request when loaded from file:// or some origins.
-    // If fetch fails, the fallback will silently remain hidden.
+  (async function(){
+    const url = 'https://sessionize.com/api/v2/86whgvu9/view/GridSmart';
+    try{
+      const res = await fetch(url, {cache:'no-store'});
+      const text = await res.text();
 
-    async function tryRenderFallback(){
-      const widget = document.getElementById('sessionize-widget');
-      const scheduleGrid = document.getElementById('schedule-grid');
-      const fallbackMeta = document.getElementById('fallback-meta');
-      const genMdBtn = document.getElementById('generate-md');
-      const openPages = document.getElementById('open-pages');
+      // Try JSON first, otherwise extract a JSON object inside returned HTML.
+      let data = null;
+      try{ data = JSON.parse(text); }
+      catch{
+        const m = text.match(/\{[\s\S]*\}/m);
+        if(m) try{ data = JSON.parse(m[0]); } catch(e){ data = null; }
+      }
+      if(!data) throw new Error('Could not parse Sessionize response.');
 
-      // Only attempt fallback if the Sessionize widget didn't inject content.
-      // Many providers replace the container innerHTML — check for children beyond noscript.
-      if(widget.children.length > 1){
-        // Widget likely loaded — do not run fallback.
-        return;
+      // Normalize to array of sessions if possible.
+      let sessions = [];
+      if (Array.isArray(data)) sessions = data;
+      else if (data.sessions) sessions = data.sessions;
+      else if (data.data && Array.isArray(data.data.sessions)) sessions = data.data.sessions;
+      else {
+        // fallback: find first array-like property
+        for(const k in data) if(Array.isArray(data[k])) { sessions = data[k]; break; }
       }
 
-      // Attempt to fetch a JSON view for the schedule.
-      // This URL may or may not be CORS-enabled. If it fails, we gracefully abort.
-      const jsonUrl = 'https://sessionize.com/api/v2/86whgvu9/view/GridSmart';
-      try{
-        const resp = await fetch(jsonUrl, {cache: 'no-store'});
-        if(!resp.ok) throw new Error('Network response not ok: '+resp.status);
+      // Simple render: Time | Title | Speakers
+      const out = document.getElementById('schedule');
+      const table = document.createElement('table');
+      table.border = 1;
+      const hdr = document.createElement('tr');
+      hdr.innerHTML = '<th>Time</th><th>Title</th><th>Speakers</th>';
+      table.appendChild(hdr);
 
-        const text = await resp.text();
-        // Sessionize sometimes returns HTML snippet. Try to find a JSON payload inside, or
-        // if it is JSON already, parse it.
-        let data = null;
-        try{ data = JSON.parse(text); }catch(_){
-          // If it's HTML, we try to extract a JSON blob inside a <script> tag that Sessionize may include.
-          const jsonMatch = text.match(/\{[\s\S]*\}/m);
-          if(jsonMatch) try{ data = JSON.parse(jsonMatch[0]); }catch(e){ data = null; }
-        }
-
-        if(!data) throw new Error('Could not parse schedule data from Sessionize response.');
-
-        // Data parsing: we expect an array of sessions or days. For robustness we'll accept several shapes.
-        const sessions = extractSessionsFromSessionizeData(data);
-        if(!sessions || sessions.length===0) throw new Error('No sessions found in data');
-
-        // Render schedule
-        renderSchedule(sessions);
-        scheduleGrid.hidden = false;
-        fallbackMeta.hidden = false;
-        genMdBtn.style.display = 'inline-block';
-        openPages.style.display = 'inline-block';
-        openPages.href = location.href; // user can copy this for Pages usage
-
-        // Generate markdown ready for README if user wants it.
-        genMdBtn.addEventListener('click', ()=>{
-          const md = generateMarkdownTable(sessions);
-          copyToClipboard(md).then(()=> alert('Markdown table copied to clipboard. Paste into README.md'))
-            .catch(()=>{ const w=window.open('about:blank','_blank'); w.document.write('<pre>'+escapeHtml(md)+'</pre>'); });
-        });
-
-      }catch(err){
-        // Quiet failure: Sessionize blocked, CORS, parse errors, or network issues.
-        console.warn('Fallback schedule not rendered:', err);
-        return;
-      }
-    }
-
-    function extractSessionsFromSessionizeData(data){
-      // Attempt to locate a sessions array in common properties.
-      if(Array.isArray(data)) return data;
-      if(data.sessions) return data.sessions;
-      if(data.data && Array.isArray(data.data.sessions)) return data.data.sessions;
-      // Some views may return an object keyed by day -> items
-      // Flatten if possible
-      for(const k in data){
-        if(Array.isArray(data[k])) return data[k];
-      }
-      return null;
-    }
-
-    function renderSchedule(sessions){
-      // Normalize fields: title, start, end, speakers, room
-      // We'll group sessions by start time for a simple two-column layout (time + slots list)
-      const byTime = {};
       sessions.forEach(s=>{
-        const start = s.start || s.startsAt || s.startDate || s.start_time || 'TBD';
-        const end = s.end || s.endsAt || s.end_time || '';
-        const title = s.title || s.sessionTitle || s.name || 'Untitled';
-        const speakers = (s.speakers || s.speakerNames || s.speakersNames || []).map(x=>typeof x==='string'?x:(x.name||x.title||'')).filter(Boolean).join(', ');
-        const room = s.room || s.roomName || s.track || '';
-        const item = {title, start, end, speakers, room, raw:s};
-        (byTime[start] = byTime[start] || []).push(item);
+        const start = s.start || s.startsAt || s.startDate || s.start_time || '';
+        const title = s.title || s.sessionTitle || s.name || '';
+        const speakers = (s.speakers || s.speakerNames || []).map(sp => typeof sp==='string'?sp:(sp.name||'')).filter(Boolean).join(', ');
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${escapeHtml(start)}</td><td>${escapeHtml(title)}</td><td>${escapeHtml(speakers)}</td>`;
+        table.appendChild(tr);
       });
 
-      // Sort times
-      const times = Object.keys(byTime).sort();
-      const timeColumn = document.getElementById('time-column');
-      const slotColumn = document.getElementById('slot-column');
-      timeColumn.innerHTML = '';
-      slotColumn.innerHTML = '';
-
-      times.forEach(t =>{
-        const timeCell = document.createElement('div');
-        timeCell.className = 'time-cell';
-        timeCell.textContent = t;
-        timeColumn.appendChild(timeCell);
-
-        const container = document.createElement('div');
-        container.style.display = 'flex';
-        container.style.flexDirection = 'column';
-        container.style.gap = '12px';
-
-        byTime[t].forEach(s =>{
-          const slot = document.createElement('article');
-          slot.className = 'slot';
-          slot.setAttribute('tabindex','0');
-          const h = document.createElement('h3'); h.textContent = s.title; slot.appendChild(h);
-          const p = document.createElement('p'); p.textContent = s.speakers || s.room || ''; slot.appendChild(p);
-          container.appendChild(slot);
-        });
-
-        slotColumn.appendChild(container);
-      });
+      out.appendChild(table);
+    }catch(err){
+      console.error(err);
+      document.getElementById('schedule').textContent = 'Failed to load Sessionize data.';
     }
 
-    function generateMarkdownTable(sessions){
-      // Simple table: Time | Title | Speakers | Room
-      let md = '| Time | Title | Speakers | Room |\n|---|---|---|---|\n';
-      const byTime = {};
-      sessions.forEach(s=>{
-        const start = s.start || s.startsAt || s.startDate || s.start_time || 'TBD';
-        const title = s.title || s.sessionTitle || s.name || 'Untitled';
-        const speakers = (s.speakers || s.speakerNames || s.speakersNames || []).map(x=>typeof x==='string'?x:(x.name||x.title||'')).filter(Boolean).join(', ');
-        const room = s.room || s.roomName || s.track || '';
-        md += `| ${escapeMarkdown(start)} | ${escapeMarkdown(title)} | ${escapeMarkdown(speakers)} | ${escapeMarkdown(room)} |\n`;
-      });
-      return md;
-    }
-
-    async function copyToClipboard(text){
-      if(navigator.clipboard) return navigator.clipboard.writeText(text);
-      return Promise.reject(new Error('Clipboard API not available'));
-    }
-
-    function escapeHtml(s){ return (''+s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
-    function escapeMarkdown(s){ return (''+s).replace(/\|/g,'\\|'); }
-
-    // Run fallback attempt after DOM load and a brief delay so the external widget can run first.
-    window.addEventListener('load', ()=> setTimeout(tryRenderFallback, 900));
+    function escapeHtml(s){ return String(s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+  })();
   </script>
-
-  
 </body>
 </html>
