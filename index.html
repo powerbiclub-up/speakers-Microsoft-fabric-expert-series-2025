@@ -1,60 +1,37 @@
-<!doctype html>
-<html>
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body>
-  <div id="schedule"></div>
-
-  <script>
-  (async function(){
-    const url = 'https://sessionize.com/api/v2/86whgvu9/view/GridSmart';
-    try{
-      const res = await fetch(url, {cache:'no-store'});
-      const text = await res.text();
-
-      // Try JSON first, otherwise extract a JSON object inside returned HTML.
-      let data = null;
-      try{ data = JSON.parse(text); }
-      catch{
-        const m = text.match(/\{[\s\S]*\}/m);
-        if(m) try{ data = JSON.parse(m[0]); } catch(e){ data = null; }
-      }
-      if(!data) throw new Error('Could not parse Sessionize response.');
-
-      // Normalize to array of sessions if possible.
-      let sessions = [];
-      if (Array.isArray(data)) sessions = data;
-      else if (data.sessions) sessions = data.sessions;
-      else if (data.data && Array.isArray(data.data.sessions)) sessions = data.data.sessions;
-      else {
-        // fallback: find first array-like property
-        for(const k in data) if(Array.isArray(data[k])) { sessions = data[k]; break; }
-      }
-
-      // Simple render: Time | Title | Speakers
-      const out = document.getElementById('schedule');
-      const table = document.createElement('table');
-      table.border = 1;
-      const hdr = document.createElement('tr');
-      hdr.innerHTML = '<th>Time</th><th>Title</th><th>Speakers</th>';
-      table.appendChild(hdr);
-
-      sessions.forEach(s=>{
-        const start = s.start || s.startsAt || s.startDate || s.start_time || '';
-        const title = s.title || s.sessionTitle || s.name || '';
-        const speakers = (s.speakers || s.speakerNames || []).map(sp => typeof sp==='string'?sp:(sp.name||'')).filter(Boolean).join(', ');
-        const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${escapeHtml(start)}</td><td>${escapeHtml(title)}</td><td>${escapeHtml(speakers)}</td>`;
-        table.appendChild(tr);
-      });
-
-      out.appendChild(table);
-    }catch(err){
-      console.error(err);
-      document.getElementById('schedule').textContent = 'Failed to load Sessionize data.';
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Microsoft Fabric Thurdays Expert Series (2025) – Speakers</title>
+  <meta name="description" content="Meet the experts on YouTube & Commudle Stage every thursday." />
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      margin: 0;
+      background-color: #f5f7fa;
+      color: #222;
     }
 
-    function escapeHtml(s){ return String(s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
-  })();
-  </script>
+    h1 {
+      color: #2B579A;
+      margin-bottom: 24px;
+    }
+
+    .speakerize-container {
+      min-height: 300px;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Microsoft Fabric Thursdays Expert Series (2025) – Speakers</h1>
+
+    <div class="speakerize-container">
+      <!-- Sessionize speaker list script -->
+     <script type="text/javascript" src="https://sessionize.com/api/v2/86whgvu9/view/GridSmart"></script>
+    </div>
+  </main>
 </body>
 </html>
